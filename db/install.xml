@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/quizsectionreset/db" VERSION="20260419" COMMENT="XMLDB file for local_quizsectionreset"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
+  <TABLES>
+    <TABLE NAME="local_quizsectionreset_cfg" COMMENT="Per-quiz configuration: max fail attempts before section reset">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="quizid"      TYPE="int"  LENGTH="10" NOTNULL="true" COMMENT="ID of the quiz (quiz.id)"/>
+        <FIELD NAME="sectionnum"  TYPE="int"  LENGTH="10" NOTNULL="true" COMMENT="Course section number to reset (0-based)"/>
+        <FIELD NAME="maxattempts" TYPE="int"  LENGTH="10" NOTNULL="true" DEFAULT="3" COMMENT="Number of failed attempts before reset"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="quizid"  TYPE="unique"  FIELDS="quizid"/>
+      </KEYS>
+    </TABLE>
+    <TABLE NAME="local_quizsectionreset_log" COMMENT="Tracks consecutive failed attempts per user per quiz">
+      <FIELDS>
+        <FIELD NAME="id"           TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="quizid"       TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="userid"       TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="failcount"    TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Consecutive failed attempts"/>
+        <FIELD NAME="resetcount"   TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Total number of resets performed"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="quizid_userid" UNIQUE="true" FIELDS="quizid, userid"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>
