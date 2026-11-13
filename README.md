@@ -1,5 +1,7 @@
 # local_quizsectionreset — Quiz Section Auto-Reset
 
+[![Made by AtlasTech](https://img.shields.io/badge/Made%20by-AtlasTech-blue)](https://atlastech.it)
+
 A Moodle local plugin (Moodle 4.0 – 5.1) that automatically resets a course section for a specific user when they fail a configured quiz N times in a row.
 
 ---
