@@ -18,7 +18,7 @@
  * Event observer for local_quizsectionreset.
  *
  * @package   local_quizsectionreset
- * @copyright 2026 Your Name
+ * @copyright 2026 Carlo Anardu
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -55,6 +55,12 @@ class observer {
 
         // Determine pass/fail by comparing sumgrades against the quiz's grade to pass.
         $quiz = $DB->get_record('quiz', ['id' => $quizid], '*', MUST_EXIST);
+
+        // Attempts still waiting for manual grading (e.g. essay questions) have no
+        // score yet: they are neither a pass nor a fail, so don't count them.
+        if ($attempt->state === 'finished' && $attempt->sumgrades === null) {
+            return;
+        }
 
         $passed = self::attempt_passed($attempt, $quiz);
 

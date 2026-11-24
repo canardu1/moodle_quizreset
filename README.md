@@ -2,7 +2,7 @@
 
 [![Made by AtlasTech](https://img.shields.io/badge/Made%20by-AtlasTech-blue)](https://atlastech.it)
 
-A Moodle local plugin (Moodle 4.0 – 5.1) that automatically resets a course section for a specific user when they fail a configured quiz N times in a row.
+A Moodle local plugin (Moodle 4.3 or later) that automatically resets a course section for a specific user when they fail a configured quiz N times in a row.
 
 ---
 
@@ -22,7 +22,7 @@ A Moodle local plugin (Moodle 4.0 – 5.1) that automatically resets a course se
 - Sends a **Moodle notification** (popup + email) to the student after each reset.
 - Fires a custom **`\local_quizsectionreset\event\section_reset`** event for logging/audit.
 - Full **GDPR / Privacy API** compliance.
-- Compatible with Moodle **4.0 – 5.1**.
+- Compatible with Moodle **4.3 and later** (Moodle 5.x not yet verified).
 
 ---
 

@@ -18,7 +18,7 @@
  * Section reset event for local_quizsectionreset.
  *
  * @package   local_quizsectionreset
- * @copyright 2026 Your Name
+ * @copyright 2026 Carlo Anardu
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 

@@ -21,7 +21,7 @@
  * Teachers with manage capability can access the page scoped to their courses.
  *
  * @package   local_quizsectionreset
- * @copyright 2026 Your Name
+ * @copyright 2026 Carlo Anardu
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -50,9 +50,16 @@ $PAGE->set_url(new moodle_url('/local/quizsectionreset/manage.php', ['courseid' 
 $PAGE->set_title(get_string('manage', 'local_quizsectionreset'));
 $PAGE->set_heading(get_string('manage', 'local_quizsectionreset'));
 
+// When managing a single course, a rule may only be touched if its quiz belongs to that course.
+if ($delete) {
+    $cfg = $DB->get_record('local_quizsectionreset_cfg', ['id' => $delete], '*', MUST_EXIST);
+    if ($courseid && !$DB->record_exists('quiz', ['id' => $cfg->quizid, 'course' => $courseid])) {
+        throw new moodle_exception('invalidquiz', 'local_quizsectionreset');
+    }
+}
+
 // Handle deletion.
 if ($delete && $confirm && confirm_sesskey()) {
-    $cfg = $DB->get_record('local_quizsectionreset_cfg', ['id' => $delete], '*', MUST_EXIST);
     $DB->delete_records('local_quizsectionreset_cfg', ['id' => $delete]);
     redirect(new moodle_url('/local/quizsectionreset/manage.php', ['courseid' => $courseid]),
         get_string('ruledeleted', 'local_quizsectionreset'), null, \core\output\notification::NOTIFY_SUCCESS);
@@ -82,12 +89,18 @@ if ($formaction === 'save' && confirm_sesskey()) {
     $sectionnum  = required_param('sectionnum',  PARAM_INT);
     $maxattempts = required_param('maxattempts', PARAM_INT);
 
-    // Validate.
-    if (!$DB->record_exists('quiz', ['id' => $quizid])) {
+    // Validate. In course mode the quiz must belong to this course.
+    $quizconditions = ['id' => $quizid];
+    if ($courseid) {
+        $quizconditions['course'] = $courseid;
+    }
+    $quiz = $DB->get_record('quiz', $quizconditions, 'id, course');
+    if (!$quiz) {
         redirect(new moodle_url('/local/quizsectionreset/manage.php', ['courseid' => $courseid]),
             get_string('invalidquiz', 'local_quizsectionreset'), null, \core\output\notification::NOTIFY_ERROR);
     }
-    if ($sectionnum < 0) {
+    // The section must exist in the quiz's course.
+    if ($sectionnum < 0 || !$DB->record_exists('course_sections', ['course' => $quiz->course, 'section' => $sectionnum])) {
         redirect(new moodle_url('/local/quizsectionreset/manage.php', ['courseid' => $courseid]),
             get_string('invalidsection', 'local_quizsectionreset'), null, \core\output\notification::NOTIFY_ERROR);
     }

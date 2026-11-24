@@ -18,7 +18,7 @@
  * Section reset logic for local_quizsectionreset.
  *
  * @package   local_quizsectionreset
- * @copyright 2026 Your Name
+ * @copyright 2026 Carlo Anardu
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -77,15 +77,17 @@ class section_resetter {
             // Reset activity-specific data.
             self::reset_module_for_user($cm, $userid);
 
-            // Reset completion state for this cm.
-            if ($completioninfo->is_enabled($cm)) {
-                $completioninfo->delete_all_state($cm);
-                // Re-evaluate completion for the user.
-                $completioninfo->update_state($cm, COMPLETION_UNKNOWN, $userid);
-            }
-
             // Delete grade for user in this cm (forces recalculation on next attempt).
             self::reset_grade_for_user($cm, $userid);
+
+            // Reset completion state for this cm, for this user only.
+            // Note: completion_info::delete_all_state() must NOT be used here,
+            // because it wipes completion for every user enrolled in the course.
+            if ($completioninfo->is_enabled($cm)) {
+                self::reset_completion_for_user($cm, $userid);
+                // Re-evaluate completion for the user now that their data is gone.
+                $completioninfo->update_state($cm, COMPLETION_UNKNOWN, $userid);
+            }
         }
 
         // Send a notification to the user.
@@ -99,6 +101,26 @@ class section_resetter {
             'other'    => ['sectionnum' => $sectionnum, 'triggerquizid' => $triggerquizid],
         ]);
         $event->trigger();
+    }
+
+    /**
+     * Delete the activity completion state of a single user for a single course module.
+     *
+     * @param \stdClass $cm
+     * @param int       $userid
+     */
+    private static function reset_completion_for_user(\stdClass $cm, int $userid): void {
+        global $DB;
+
+        $DB->delete_records('course_modules_completion', ['coursemoduleid' => $cm->id, 'userid' => $userid]);
+
+        // "Viewed" state is stored separately since Moodle 4.3.
+        if ($DB->get_manager()->table_exists('course_modules_viewed')) {
+            $DB->delete_records('course_modules_viewed', ['coursemoduleid' => $cm->id, 'userid' => $userid]);
+        }
+
+        // Drop the user's cached completion data for this course.
+        \cache::make('core', 'completion')->delete($userid . '_' . $cm->course);
     }
 
     /**
@@ -169,16 +191,30 @@ class section_resetter {
 
         require_once($CFG->dirroot . '/mod/assign/locallib.php');
 
-        // Get and delete the submission.
-        $submission = $DB->get_record('assign_submission', ['assignment' => $assignid, 'userid' => $userid, 'groupid' => 0]);
-        if ($submission) {
-            // Remove plugin submission data (files, online text, etc.).
+        $cm      = get_coursemodule_from_instance('assign', $assignid, 0, false, MUST_EXIST);
+        $context = \context_module::instance($cm->id);
+        $fs      = get_file_storage();
+
+        // An assignment can hold several submissions per user (one per attempt when
+        // "additional attempts" are allowed), so handle all of them.
+        $submissions = $DB->get_records('assign_submission',
+            ['assignment' => $assignid, 'userid' => $userid, 'groupid' => 0]);
+        foreach ($submissions as $submission) {
+            // Remove plugin submission data and the files stored on disk.
+            $fs->delete_area_files($context->id, 'assignsubmission_file', 'submission_files', $submission->id);
+            $fs->delete_area_files($context->id, 'assignsubmission_onlinetext', 'submissions_onlinetext', $submission->id);
             $DB->delete_records('assignsubmission_file', ['submission' => $submission->id]);
             $DB->delete_records('assignsubmission_onlinetext', ['submission' => $submission->id]);
             $DB->delete_records('assign_submission', ['id' => $submission->id]);
         }
 
-        // Remove grade record.
+        // Remove grade records together with their feedback.
+        $grades = $DB->get_records('assign_grades', ['assignment' => $assignid, 'userid' => $userid]);
+        foreach ($grades as $grade) {
+            $fs->delete_area_files($context->id, 'assignfeedback_file', 'feedback_files', $grade->id);
+            $DB->delete_records('assignfeedback_comments', ['grade' => $grade->id]);
+            $DB->delete_records('assignfeedback_file', ['grade' => $grade->id]);
+        }
         $DB->delete_records('assign_grades', ['assignment' => $assignid, 'userid' => $userid]);
     }
 
@@ -191,10 +227,14 @@ class section_resetter {
     private static function reset_scorm(int $scormid, int $userid): void {
         global $DB;
 
-        $scos = $DB->get_records('scorm_scoes', ['scorm' => $scormid]);
+        // Since Moodle 4.3 SCORM tracking lives in scorm_attempt + scorm_scoes_value
+        // (the old scorm_scoes_track table no longer exists).
+        $attemptids = $DB->get_fieldset_select('scorm_attempt', 'id',
+            'scormid = :scormid AND userid = :userid', ['scormid' => $scormid, 'userid' => $userid]);
 
-        foreach ($scos as $sco) {
-            $DB->delete_records('scorm_scoes_track', ['userid' => $userid, 'scoid' => $sco->id]);
+        if ($attemptids) {
+            [$insql, $params] = $DB->get_in_or_equal($attemptids, SQL_PARAMS_NAMED);
+            $DB->delete_records_select('scorm_scoes_value', "attemptid $insql", $params);
         }
 
         $DB->delete_records('scorm_attempt', ['scormid' => $scormid, 'userid' => $userid]);
@@ -286,7 +326,8 @@ class section_resetter {
         $a = (object)[
             'firstname'   => $user->firstname,
             'quizname'    => format_string($quiz->name),
-            'failcount'   => $log ? ($log->failcount + 1) : 1,
+            // The observer has already counted the current attempt before calling us.
+            'failcount'   => $log ? (int)$log->failcount : 1,
             'sectionname' => $sectionname,
             'sitename'    => format_string($CFG->sitename ?? ''),
         ];
